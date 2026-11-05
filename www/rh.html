@@ -247,20 +247,32 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") document.que
 // ================= Sesión =================
 $("#fLogin").addEventListener("submit", async e => {
   e.preventDefault(); $("#lError").textContent = "";
+  const b = $("#fLogin button"); b.disabled = true; b.textContent = "Entrando…";
   const { error } = await sb.auth.signInWithPassword({ email: $("#lEmail").value.trim(), password: $("#lPass").value });
-  if (error) $("#lError").textContent = "Correo o contraseña incorrectos.";
+  if (error) { $("#lError").textContent = "Correo o contraseña incorrectos."; b.disabled = false; b.textContent = "Entrar"; }
 });
 $("#btnSalir").addEventListener("click", () => sb.auth.signOut());
 
-sb.auth.onAuthStateChange(async (_ev, ses) => {
-  if (!ses) { usuario = null; canal && sb.removeChannel(canal); canal = null; $("#vApp").classList.add("hidden"); $("#vLogin").classList.remove("hidden"); return; }
+// Importante: no se llama a Supabase dentro del aviso de sesión (se traba); se hace en el siguiente ciclo.
+function mostrarLogin(msg) {
+  usuario = null; if (canal) { sb.removeChannel(canal); canal = null; }
+  $("#vApp").classList.add("hidden"); $("#vLogin").classList.remove("hidden");
+  $("#lError").textContent = msg || "";
+  const b = $("#fLogin button"); b.disabled = false; b.textContent = "Entrar";
+}
+async function entrarConSesion(ses) {
   if (usuario?.id === ses.user.id) return;
-  const { data: ok } = await sb.rpc("campo_es_rh");
-  if (!ok) { $("#lError").textContent = `${ses.user.email} no está autorizado en este panel.`; await sb.auth.signOut(); return; }
+  const { data: ok, error } = await sb.rpc("campo_es_rh");
+  if (error) return mostrarLogin("No se pudo validar tu acceso. Intenta de nuevo.");
+  if (!ok) { await sb.auth.signOut(); return mostrarLogin(`${ses.user.email} no está autorizado en este panel.`); }
   usuario = ses.user;
   $("#hUsuario").textContent = usuario.email;
   $("#vLogin").classList.add("hidden"); $("#vApp").classList.remove("hidden");
   iniciarApp();
+}
+sb.auth.onAuthStateChange((ev, ses) => {
+  if (!ses) { setTimeout(() => mostrarLogin(ev === "SIGNED_OUT" ? "" : "Tu sesión terminó. Vuelve a entrar."), 0); return; }
+  setTimeout(() => entrarConSesion(ses), 0);
 });
 
 // ================= Tabs =================
@@ -268,6 +280,7 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
   document.querySelectorAll(".tab").forEach(x => { x.classList.toggle("activo", x === t); x.classList.toggle("text-muted", x !== t); });
   document.querySelectorAll(".tabpanel").forEach(p => p.classList.toggle("hidden", p.id !== t.dataset.tab));
   if (t.dataset.tab === "tAsis") setTimeout(() => mapa.invalidateSize(), 50);
+  if (t.dataset.tab === "tEmp") cargarEmpleados();
 }));
 
 // ================= Asistencias =================
@@ -363,6 +376,7 @@ function suscribir() {
       if (i >= 0) asistencias[i] = a; else if (enRango) asistencias.unshift(a);
       pintarAsistencias();
       if (p.eventType === "INSERT" && a.estatus === "PENDIENTE_APROBACION_RH") alertarPendiente(a);
+      if (p.eventType === "INSERT") setTimeout(cargarEmpleados, 1500); // refresca "Vinculado"
     }).subscribe();
 }
 function alertarPendiente(a) {
