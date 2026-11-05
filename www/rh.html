@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="icons/icon-192.png">
+<title>RH · Checador de Campo</title>
+<script src="js/config.js"></script>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="js/theme.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+<script src="js/rostro.js"></script>
+<style>
+  .tab.activo{border-color:rgb(var(--primary));color:rgb(var(--primary))}
+  .modal{display:none}.modal.abierto{display:flex}
+  .pin{width:26px;height:26px;border-radius:50%;color:#fff;font:700 12px/26px system-ui;text-align:center;border:2px solid #fff;box-shadow:0 1px 4px #0006}
+  .leaflet-container{background:rgb(var(--line))}
+  th{position:sticky;top:0;background:rgb(var(--surface));z-index:1}
+</style>
+</head>
+<body class="font-sans antialiased min-h-screen">
+
+<!-- ===== Login ===== -->
+<section id="vLogin" class="min-h-screen flex items-center justify-center p-4">
+  <form id="fLogin" class="w-full max-w-sm bg-surface border border-line rounded-2xl p-6 shadow space-y-4">
+    <div class="flex items-center gap-2 text-primary"><i data-lucide="shield-check" class="w-7 h-7"></i>
+      <h1 class="text-xl font-semibold">Panel RH · Checador de Campo</h1></div>
+    <input id="lEmail" type="email" required placeholder="Correo" class="w-full px-3 py-2.5 rounded-lg bg-bg border border-line">
+    <input id="lPass" type="password" required placeholder="Contraseña" class="w-full px-3 py-2.5 rounded-lg bg-bg border border-line">
+    <button class="w-full py-2.5 rounded-lg bg-primary text-on-primary font-semibold">Entrar</button>
+    <p id="lError" class="text-sm text-danger"></p>
+  </form>
+</section>
+
+<!-- ===== App ===== -->
+<section id="vApp" class="hidden min-h-screen flex flex-col">
+  <header class="bg-primary text-on-primary px-6 py-3 flex items-center gap-4 shadow">
+    <i data-lucide="map-pin-check" class="w-6 h-6"></i>
+    <h1 class="font-semibold text-lg flex-1">Checador de Campo · RH</h1>
+    <span id="hUsuario" class="text-sm opacity-80"></span>
+    <button id="btnSalir" class="text-sm px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25">Salir</button>
+  </header>
+  <nav class="bg-surface border-b border-line px-6 flex gap-6 text-sm font-medium">
+    <button class="tab activo py-3 border-b-2 border-transparent" data-tab="tAsis">Asistencias <span id="badgePend" class="hidden ml-1 px-1.5 rounded-full bg-warning text-white text-xs"></span></button>
+    <button class="tab py-3 border-b-2 border-transparent text-muted" data-tab="tEmp">Empleados y enrolamiento</button>
+  </nav>
+
+  <!-- --- Asistencias --- -->
+  <main id="tAsis" class="tabpanel flex-1 p-6 space-y-4">
+    <div class="flex flex-wrap items-end gap-3">
+      <label class="text-xs text-muted">Desde<input id="fDesde" type="date" class="block mt-1 px-3 py-2 rounded-lg bg-surface border border-line text-fg"></label>
+      <label class="text-xs text-muted">Hasta<input id="fHasta" type="date" class="block mt-1 px-3 py-2 rounded-lg bg-surface border border-line text-fg"></label>
+      <label class="text-xs text-muted">Estatus
+        <select id="fEstatus" class="block mt-1 px-3 py-2 rounded-lg bg-surface border border-line text-fg">
+          <option value="">Todos</option>
+          <option value="PENDIENTE_APROBACION_RH">Pendiente</option>
+          <option value="APROBADO">Aprobado (auto + RH)</option>
+          <option value="RECHAZADO">Rechazado</option>
+        </select></label>
+      <label class="text-xs text-muted flex-1 min-w-[180px]">Buscar<input id="fBuscar" type="search" placeholder="ID o nombre" class="block w-full mt-1 px-3 py-2 rounded-lg bg-surface border border-line text-fg"></label>
+      <button id="btnRecargar" class="px-3 py-2 rounded-lg border border-line bg-surface flex items-center gap-1 text-sm"><i data-lucide="refresh-cw" class="w-4 h-4"></i>Actualizar</button>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3" id="contadores"></div>
+
+    <div class="grid lg:grid-cols-5 gap-4">
+      <div class="lg:col-span-2 bg-surface border border-line rounded-2xl overflow-hidden">
+        <div class="px-4 py-2 text-sm font-medium border-b border-line flex items-center gap-3">
+          <span class="flex-1">Mapa en vivo</span>
+          <span class="flex items-center gap-1 text-xs text-muted"><span class="pin !w-4 !h-4 !leading-4 !text-[9px]" style="background:rgb(var(--primary))">A</span>Sitio fijo</span>
+          <span class="flex items-center gap-1 text-xs text-muted"><span class="pin !w-4 !h-4 !leading-4 !text-[9px]" style="background:rgb(var(--secondary))">B</span>Checada</span>
+        </div>
+        <div id="mapa" class="h-[520px]"></div>
+      </div>
+      <div class="lg:col-span-3 bg-surface border border-line rounded-2xl overflow-hidden flex flex-col">
+        <div class="overflow-auto max-h-[560px]">
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-muted text-xs uppercase">
+              <th class="px-3 py-2">Hora servidor</th><th class="px-3 py-2">Empleado</th><th class="px-3 py-2">Estatus</th>
+              <th class="px-3 py-2 text-right">Distancia</th><th class="px-3 py-2 text-right">Rostro</th><th class="px-3 py-2">Causa</th>
+            </tr></thead>
+            <tbody id="tbAsis" class="divide-y divide-line"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- --- Empleados --- -->
+  <main id="tEmp" class="tabpanel hidden flex-1 p-6 space-y-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <input id="eBuscar" type="search" placeholder="Buscar por ID, nombre o departamento" class="flex-1 min-w-[220px] px-3 py-2 rounded-lg bg-surface border border-line">
+      <select id="eFiltro" class="px-3 py-2 rounded-lg bg-surface border border-line">
+        <option value="campo">Solo los que checan en campo</option>
+        <option value="oficina">Solo oficina (Hikvision)</option>
+        <option value="">Todos</option>
+      </select>
+      <label class="px-3 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium cursor-pointer flex items-center gap-2">
+        <i data-lucide="file-up" class="w-4 h-4"></i>Importar CSV / Excel
+        <input id="eImportar" type="file" accept=".csv,.xlsx,.xls" class="hidden">
+      </label>
+    </div>
+    <p class="text-xs text-muted">“Campo” = puede usar la app del checador (APK / iPhone). Quien no la tenga marcada no aparece en la app. “Sitio fijo” es opcional: si se deja libre, solo se guarda la coordenada donde tomó la foto.</p>
+    <p class="text-xs text-muted">Columnas reconocidas: ID_Empleado / ID, Nombre, Teléfono, Puesto, Departamento, Alta, Ubicación, Ubicación_Asignada_Lat, Ubicación_Asignada_Lng, Radio_Permitido_Mts. Solo se actualizan las columnas que traiga el archivo.</p>
+    <div id="eResumen" class="text-sm"></div>
+    <div class="bg-surface border border-line rounded-2xl overflow-auto max-h-[70vh]">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-muted text-xs uppercase">
+          <th class="px-3 py-2">ID</th><th class="px-3 py-2">Nombre</th><th class="px-3 py-2">Puesto / Depto.</th>
+          <th class="px-3 py-2">Campo</th><th class="px-3 py-2">Sitio fijo</th><th class="px-3 py-2">Biometría</th><th class="px-3 py-2">Activo</th><th class="px-3 py-2"></th>
+        </tr></thead>
+        <tbody id="tbEmp" class="divide-y divide-line"></tbody>
+      </table>
+    </div>
+  </main>
+</section>
+
+<!-- ===== Modal revisión ===== -->
+<div id="mRev" class="modal fixed inset-0 z-[1000] bg-black/60 items-center justify-center p-4">
+  <div class="bg-surface rounded-2xl w-full max-w-5xl max-h-[95vh] overflow-auto shadow-xl">
+    <div class="px-6 py-4 border-b border-line flex items-center gap-3">
+      <h3 class="font-semibold text-lg flex-1" id="rTitulo"></h3>
+      <span id="rEstatus"></span>
+      <button data-cerrar class="p-1 rounded hover:bg-line"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-6 grid md:grid-cols-2 gap-6">
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <figure><figcaption class="text-xs text-muted mb-1">Foto de expediente</figcaption>
+            <div class="aspect-[3/4] rounded-xl bg-line overflow-hidden"><img id="rFotoExp" class="w-full h-full object-cover" alt=""></div></figure>
+          <figure><figcaption class="text-xs text-muted mb-1">Foto en vivo</figcaption>
+            <div class="aspect-[3/4] rounded-xl bg-line overflow-hidden"><img id="rFotoVivo" class="w-full h-full object-cover" alt=""></div></figure>
+        </div>
+        <dl id="rDatos" class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm"></dl>
+      </div>
+      <div class="space-y-3">
+        <div id="rMapa" class="h-72 rounded-xl overflow-hidden border border-line"></div>
+        <ul id="rCausas" class="space-y-1 text-sm"></ul>
+        <div id="rAcciones" class="space-y-2">
+          <textarea id="rObs" rows="3" placeholder="Justificación u observaciones" class="w-full px-3 py-2 rounded-lg bg-bg border border-line"></textarea>
+          <button id="btnEnrolarCon" class="hidden w-full py-3 rounded-xl bg-primary text-on-primary font-semibold">APROBAR Y USAR ESTA FOTO COMO EXPEDIENTE</button>
+          <div class="flex gap-3">
+            <button id="btnAprobar" class="flex-1 py-3 rounded-xl bg-accent text-white font-semibold">APROBAR</button>
+            <button id="btnRechazar" class="flex-1 py-3 rounded-xl bg-danger text-white font-semibold">RECHAZAR</button>
+          </div>
+        </div>
+        <div id="rRevisado" class="text-sm text-muted"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal ubicación ===== -->
+<div id="mUbi" class="modal fixed inset-0 z-[1000] bg-black/60 items-center justify-center p-4">
+  <div class="bg-surface rounded-2xl w-full max-w-3xl shadow-xl">
+    <div class="px-6 py-4 border-b border-line flex items-center">
+      <h3 class="font-semibold flex-1" id="uTitulo">Sitio fijo (opcional)</h3>
+      <button data-cerrar class="p-1 rounded hover:bg-line"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-6 space-y-3">
+      <p class="text-xs text-muted">Haz clic en el mapa para colocar el punto (o pega coordenadas).</p>
+      <div id="uMapa" class="h-80 rounded-xl overflow-hidden border border-line"></div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <label class="text-xs text-muted col-span-2">Nombre del sitio<input id="uNombre" class="block w-full mt-1 px-3 py-2 rounded-lg bg-bg border border-line text-fg" placeholder="Ej. EDS Palma Gorda"></label>
+        <label class="text-xs text-muted">Latitud<input id="uLat" type="number" step="any" class="block w-full mt-1 px-3 py-2 rounded-lg bg-bg border border-line text-fg"></label>
+        <label class="text-xs text-muted">Longitud<input id="uLng" type="number" step="any" class="block w-full mt-1 px-3 py-2 rounded-lg bg-bg border border-line text-fg"></label>
+        <label class="text-xs text-muted">Radio permitido (m)<input id="uRadio" type="number" min="10" max="5000" class="block w-full mt-1 px-3 py-2 rounded-lg bg-bg border border-line text-fg"></label>
+      </div>
+      <div class="flex justify-end gap-3">
+        <button id="uQuitar" class="px-4 py-2 rounded-lg border border-line text-sm">Dejar libre</button>
+        <button id="uGuardar" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-semibold">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal enrolamiento ===== -->
+<div id="mEnr" class="modal fixed inset-0 z-[1000] bg-black/60 items-center justify-center p-4">
+  <div class="bg-surface rounded-2xl w-full max-w-lg shadow-xl">
+    <div class="px-6 py-4 border-b border-line flex items-center">
+      <h3 class="font-semibold flex-1" id="enTitulo">Enrolamiento facial</h3>
+      <button data-cerrar class="p-1 rounded hover:bg-line"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-6 space-y-3">
+      <p class="text-xs text-muted">Rostro de frente, sin lentes oscuros ni gorra, buena luz y fondo liso.</p>
+      <div class="relative aspect-[3/4] max-h-[50vh] mx-auto rounded-xl bg-black overflow-hidden">
+        <video id="enVideo" autoplay playsinline muted class="w-full h-full object-cover" style="transform:scaleX(-1)"></video>
+        <img id="enPreview" class="hidden absolute inset-0 w-full h-full object-cover" alt="">
+      </div>
+      <div class="flex gap-3">
+        <button id="enCapturar" class="flex-1 py-2.5 rounded-lg bg-primary text-on-primary font-semibold flex items-center justify-center gap-2"><i data-lucide="camera" class="w-4 h-4"></i>Capturar</button>
+        <label class="flex-1 py-2.5 rounded-lg border border-line text-center cursor-pointer text-sm leading-6">Subir archivo
+          <input id="enArchivo" type="file" accept="image/jpeg,image/png" class="hidden"></label>
+        <button id="enRepetir" class="hidden flex-1 py-2.5 rounded-lg border border-line text-sm">Repetir</button>
+      </div>
+      <button id="enGuardar" disabled class="w-full py-3 rounded-xl bg-accent text-white font-semibold disabled:opacity-40">Guardar como foto de expediente</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="fixed bottom-4 right-4 z-[2000] space-y-2 w-80"></div>
+
+<script>
+const C = window.APP_CONFIG;
+const sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+const BUCKET = "campo-biometria";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+const css = v => `rgb(${getComputedStyle(document.documentElement).getPropertyValue("--" + v).trim().replace(/ /g, ",")})`;
+const fHora = t => new Date(t).toLocaleString("es-MX", { timeZone: C.ZONA_HORARIA, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const hoyISO = () => new Date().toLocaleDateString("en-CA", { timeZone: C.ZONA_HORARIA });
+
+const EST = {
+  APROBADO_AUTOMATICO:     { txt: "Aprobado auto", cls: "bg-accent/15 text-accent", color: "accent" },
+  APROBADO_RH:             { txt: "Aprobado RH",   cls: "bg-primary/15 text-primary", color: "primary" },
+  PENDIENTE_APROBACION_RH: { txt: "Pendiente",     cls: "bg-warning/15 text-warning", color: "warning" },
+  RECHAZADO:               { txt: "Rechazado",     cls: "bg-danger/15 text-danger", color: "danger" },
+};
+const badge = e => `<span class="px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${EST[e].cls}">${EST[e].txt}</span>`;
+
+let usuario = null, asistencias = [], empleados = [], mapa, capa, canal;
+
+function toast(msg, tipo = "info") {
+  const el = document.createElement("div");
+  el.className = `p-3 rounded-xl shadow-lg text-sm text-white ${tipo === "error" ? "bg-danger" : tipo === "alerta" ? "bg-warning" : "bg-primary"}`;
+  el.textContent = msg; $("#toasts").appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+function abrir(id) { $(id).classList.add("abierto"); }
+function cerrar(m) { m.classList.remove("abierto"); if (m.id === "mEnr") detenerWebcam(); }
+document.querySelectorAll(".modal").forEach(m => {
+  m.addEventListener("click", e => { if (e.target === m || e.target.closest("[data-cerrar]")) cerrar(m); });
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".modal.abierto").forEach(cerrar); });
+
+// ================= Sesión =================
+$("#fLogin").addEventListener("submit", async e => {
+  e.preventDefault(); $("#lError").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email: $("#lEmail").value.trim(), password: $("#lPass").value });
+  if (error) $("#lError").textContent = "Correo o contraseña incorrectos.";
+});
+$("#btnSalir").addEventListener("click", () => sb.auth.signOut());
+
+sb.auth.onAuthStateChange(async (_ev, ses) => {
+  if (!ses) { usuario = null; canal && sb.removeChannel(canal); canal = null; $("#vApp").classList.add("hidden"); $("#vLogin").classList.remove("hidden"); return; }
+  if (usuario?.id === ses.user.id) return;
+  const { data: ok } = await sb.rpc("campo_es_rh");
+  if (!ok) { $("#lError").textContent = `${ses.user.email} no está autorizado en este panel.`; await sb.auth.signOut(); return; }
+  usuario = ses.user;
+  $("#hUsuario").textContent = usuario.email;
+  $("#vLogin").classList.add("hidden"); $("#vApp").classList.remove("hidden");
+  iniciarApp();
+});
+
+// ================= Tabs =================
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x => { x.classList.toggle("activo", x === t); x.classList.toggle("text-muted", x !== t); });
+  document.querySelectorAll(".tabpanel").forEach(p => p.classList.toggle("hidden", p.id !== t.dataset.tab));
+  if (t.dataset.tab === "tAsis") setTimeout(() => mapa.invalidateSize(), 50);
+}));
+
+// ================= Asistencias =================
+function iniciarApp() {
+  $("#fDesde").value = $("#fHasta").value = hoyISO();
+  if (!mapa) {
+    mapa = L.map("mapa").setView(C.CENTRO_MAPA, 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(mapa);
+    capa = L.layerGroup().addTo(mapa);
+  }
+  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+  cargarAsistencias(); cargarEmpleados(); suscribir();
+}
+
+const rangoUTC = () => [new Date(`${$("#fDesde").value}T00:00:00`).toISOString(), new Date(`${$("#fHasta").value}T23:59:59.999`).toISOString()];
+
+async function cargarAsistencias() {
+  const [d, h] = rangoUTC();
+  const { data, error } = await sb.from("campo_asistencias").select("*")
+    .gte("ts_servidor", d).lte("ts_servidor", h).order("ts_servidor", { ascending: false }).limit(2000);
+  if (error) return toast("Error al cargar asistencias: " + error.message, "error");
+  asistencias = data; pintarAsistencias();
+}
+["#fDesde", "#fHasta"].forEach(s => $(s).addEventListener("change", cargarAsistencias));
+["#fEstatus", "#fBuscar"].forEach(s => $(s).addEventListener("input", pintarAsistencias));
+$("#btnRecargar").addEventListener("click", cargarAsistencias);
+
+function filtradas() {
+  const est = $("#fEstatus").value, q = norm($("#fBuscar").value.trim());
+  return asistencias.filter(a =>
+    (!est || (est === "APROBADO" ? a.estatus.startsWith("APROBADO") : a.estatus === est)) &&
+    (!q || norm(a.empleado_id).includes(q) || norm(a.empleado_nombre).includes(q)));
+}
+
+function pintarAsistencias() {
+  const n = k => asistencias.filter(a => k(a.estatus)).length;
+  const tarjetas = [
+    ["Total", asistencias.length, "fg"], ["Pendientes", n(e => e === "PENDIENTE_APROBACION_RH"), "warning"],
+    ["Aprobadas", n(e => e.startsWith("APROBADO")), "accent"], ["Rechazadas", n(e => e === "RECHAZADO"), "danger"]];
+  $("#contadores").innerHTML = tarjetas.map(([t, v, c]) =>
+    `<div class="bg-surface border border-line rounded-2xl p-4"><p class="text-xs text-muted">${t}</p><p class="text-2xl font-bold text-${c}">${v}</p></div>`).join("");
+  const pend = n(e => e === "PENDIENTE_APROBACION_RH");
+  $("#badgePend").textContent = pend; $("#badgePend").classList.toggle("hidden", !pend);
+
+  const f = filtradas();
+  $("#tbAsis").innerHTML = f.length ? f.map(a => `
+    <tr data-id="${a.id}" class="hover:bg-primary/5 cursor-pointer ${a.estatus === "PENDIENTE_APROBACION_RH" ? "bg-warning/5" : ""}">
+      <td class="px-3 py-2 whitespace-nowrap">${fHora(a.ts_servidor)}</td>
+      <td class="px-3 py-2"><span class="font-mono text-xs text-muted">${esc(a.empleado_id)}</span> ${esc(a.empleado_nombre)}</td>
+      <td class="px-3 py-2">${badge(a.estatus)}</td>
+      <td class="px-3 py-2 text-right whitespace-nowrap">${a.distancia_m != null ? Math.round(a.distancia_m) + " m" : "—"}</td>
+      <td class="px-3 py-2 text-right">${a.similitud != null ? a.similitud.toFixed(0) + "%" : "—"}</td>
+      <td class="px-3 py-2 text-xs text-muted max-w-[260px] truncate" title="${esc(a.causas.join(" · "))}">${esc(a.causas.join(" · "))}</td>
+    </tr>`).join("") : `<tr><td colspan="6" class="px-3 py-8 text-center text-muted">Sin checadas en el rango</td></tr>`;
+  pintarMapa(f);
+}
+$("#tbAsis").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-id]"); if (tr) abrirRevision(asistencias.find(a => a.id === tr.dataset.id));
+});
+
+const pin = (letra, color) => L.divIcon({ className: "", html: `<div class="pin" style="background:${css(color)}">${letra}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
+
+function dibujarPar(grupo, a, conRadio) {
+  const B = [a.lat, a.lng], pts = [B];
+  const col = EST[a.estatus].color;
+  L.marker(B, { icon: pin("B", col) }).bindPopup(`<b>${esc(a.empleado_nombre)}</b><br>${fHora(a.ts_servidor)}<br>${EST[a.estatus].txt}`)
+    .on("click", () => grupo === capa && abrirRevision(a)).addTo(grupo);
+  L.circle(B, { radius: a.precision_m, color: css(col), weight: 1, fillOpacity: .08 }).addTo(grupo);
+  if (a.asig_lat != null) {
+    const A = [a.asig_lat, a.asig_lng]; pts.push(A);
+    L.marker(A, { icon: pin("A", "primary") }).bindPopup(esc(a.ubicacion_nombre || "Ubicación asignada")).addTo(grupo);
+    if (conRadio && a.radio_m) L.circle(A, { radius: a.radio_m, color: css("primary"), weight: 1, dashArray: "4", fillOpacity: .06 }).addTo(grupo);
+    L.polyline([A, B], { color: css(col), weight: 3, dashArray: "6 6" })
+      .bindTooltip(`${Math.round(a.distancia_m ?? 0)} m`, { permanent: true, direction: "center", className: "!text-xs !font-semibold" }).addTo(grupo);
+  }
+  return pts;
+}
+function pintarMapa(lista) {
+  capa.clearLayers();
+  const pts = lista.slice(0, 300).flatMap(a => dibujarPar(capa, a, false));
+  if (pts.length) mapa.fitBounds(pts, { padding: [40, 40], maxZoom: 16 });
+}
+
+// ---------- Tiempo real ----------
+function suscribir() {
+  if (canal) sb.removeChannel(canal);
+  canal = sb.channel("campo-asistencias")
+    .on("postgres_changes", { event: "*", schema: "public", table: "campo_asistencias" }, p => {
+      const a = p.new; if (!a?.id) return;
+      const [d, h] = rangoUTC();
+      const enRango = a.ts_servidor >= d && a.ts_servidor <= h;
+      const i = asistencias.findIndex(x => x.id === a.id);
+      if (i >= 0) asistencias[i] = a; else if (enRango) asistencias.unshift(a);
+      pintarAsistencias();
+      if (p.eventType === "INSERT" && a.estatus === "PENDIENTE_APROBACION_RH") alertarPendiente(a);
+    }).subscribe();
+}
+function alertarPendiente(a) {
+  const msg = `${a.empleado_nombre}: ${a.causas.join(" · ")}`;
+  toast("Checada pendiente — " + msg, "alerta");
+  try { const ctx = new AudioContext(), o = ctx.createOscillator(); o.frequency.value = 880; o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + .25); } catch {}
+  if ("Notification" in window && Notification.permission === "granted") {
+    const n = new Notification("Checada pendiente de aprobación", { body: msg, icon: "icons/icon-192.png" });
+    n.onclick = () => { window.focus(); abrirRevision(a); };
+  }
+}
+
+// ---------- Modal de revisión ----------
+let mapaRev, actual;
+async function abrirRevision(a) {
+  actual = a;
+  $("#rTitulo").textContent = `${a.empleado_id} · ${a.empleado_nombre}`;
+  $("#rEstatus").innerHTML = badge(a.estatus);
+  $("#rFotoExp").removeAttribute("src"); $("#rFotoVivo").removeAttribute("src");
+  const desfase = a.distancia_m != null && a.radio_m != null ? Math.max(0, a.distancia_m - a.radio_m) : null;
+  const datos = [
+    ["Hora del servidor", fHora(a.ts_servidor)], ["Sitio fijo", a.asig_lat != null ? (a.ubicacion_nombre || "Sin nombre") : "Libre"],
+    ["Distancia", a.distancia_m != null ? `${Math.round(a.distancia_m)} m` : "—"], ["Radio permitido", a.radio_m != null ? `${a.radio_m} m` : "—"],
+    ["Metros de desfase", desfase != null ? `${Math.round(desfase)} m` : "—"], ["Precisión GPS", `${Math.round(a.precision_m)} m`],
+    ["Coincidencia facial", a.similitud != null ? `${a.similitud.toFixed(1)}%` : "—"], ["Plataforma", a.plataforma || "—"]];
+  $("#rDatos").innerHTML = datos.map(([k, v]) => `<dt class="text-muted">${k}</dt><dd class="font-medium">${esc(v)}</dd>`).join("");
+  $("#rCausas").innerHTML = a.causas.map(c => `<li class="px-3 py-2 rounded-lg bg-warning/10 text-warning">${esc(c)}</li>`).join("");
+  const pendiente = a.estatus === "PENDIENTE_APROBACION_RH";
+  $("#rAcciones").classList.toggle("hidden", !pendiente);
+  const empA = empleados.find(e => e.id === a.empleado_id);
+  $("#btnEnrolarCon").classList.toggle("hidden", !(pendiente && empA && !empA.foto_expediente));
+  $("#rObs").value = "";
+  $("#rRevisado").innerHTML = a.revisado_en ? `Revisado por <b>${esc(a.revisado_por)}</b> el ${fHora(a.revisado_en)}${a.observaciones ? `<br>Observaciones: ${esc(a.observaciones)}` : ""}` : "";
+  abrir("#mRev");
+
+  setTimeout(() => {
+    if (mapaRev) mapaRev.remove();
+    mapaRev = L.map("rMapa");
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(mapaRev);
+    const pts = dibujarPar(mapaRev, a, true);
+    if (pts.length > 1) mapaRev.fitBounds(pts, { padding: [40, 40], maxZoom: 18 }); else mapaRev.setView(pts[0], 17);
+  }, 60);
+
+  const rutas = [a.foto_path, a.expediente_path].filter(Boolean);
+  const { data } = await sb.storage.from(BUCKET).createSignedUrls(rutas, 300);
+  if (actual !== a || !data) return;
+  const url = p => data.find(x => x.path === p)?.signedUrl;
+  if (url(a.foto_path)) $("#rFotoVivo").src = url(a.foto_path);
+  if (a.expediente_path && url(a.expediente_path)) $("#rFotoExp").src = url(a.expediente_path);
+}
+async function resolver(estatus) {
+  const obs = $("#rObs").value.trim();
+  if (estatus === "RECHAZADO" && !obs) return toast("Escribe el motivo del rechazo.", "error");
+  const { data, error } = await sb.from("campo_asistencias").update({ estatus, observaciones: obs || null })
+    .eq("id", actual.id).select().single();
+  if (error) return toast("No se pudo guardar: " + error.message, "error");
+  const i = asistencias.findIndex(x => x.id === data.id); if (i >= 0) asistencias[i] = data;
+  pintarAsistencias(); cerrar($("#mRev"));
+  toast(estatus === "RECHAZADO" ? "Checada rechazada" : "Checada aprobada");
+}
+$("#btnAprobar").addEventListener("click", () => resolver("APROBADO_RH"));
+// Enrolamiento desde la primera checada: RH confirma visualmente que es la persona correcta.
+$("#btnEnrolarCon").addEventListener("click", async () => {
+  const a = actual, emp = empleados.find(e => e.id === a.empleado_id);
+  if (!confirm(`¿Confirmas que la foto es de ${emp.nombre}? Será su foto de expediente para las siguientes checadas.`)) return;
+  const dl = await sb.storage.from(BUCKET).download(a.foto_path);
+  if (dl.error) return toast("No se pudo leer la foto: " + dl.error.message, "error");
+  const img = new Image(); img.src = URL.createObjectURL(dl.data); await img.decode();
+  const lienzo = document.createElement("canvas"); lienzo.width = img.naturalWidth; lienzo.height = img.naturalHeight;
+  lienzo.getContext("2d").drawImage(img, 0, 0);
+  let huella = null; try { huella = await Rostro.huella(lienzo); } catch { }
+  if (!huella) return toast("No se detectó un rostro claro en esa foto; enrólalo desde Empleados.", "error");
+  const ruta = `expediente/${emp.id}.jpg`;
+  const up = await sb.storage.from(BUCKET).upload(ruta, dl.data, { contentType: "image/jpeg", upsert: true });
+  if (up.error) return toast("No se pudo guardar el expediente: " + up.error.message, "error");
+  const cambios = { foto_expediente: ruta, huella, foto_actualizada_en: new Date().toISOString() };
+  const { error } = await sb.from("campo_empleados").update(cambios).eq("id", emp.id);
+  if (error) return toast(error.message, "error");
+  Object.assign(emp, cambios); pintarEmpleados();
+  if (!$("#rObs").value.trim()) $("#rObs").value = "Enrolado con la foto de esta checada";
+  resolver("APROBADO_RH");
+});
+$("#btnRechazar").addEventListener("click", () => resolver("RECHAZADO"));
+
+// ================= Empleados =================
+async function cargarEmpleados() {
+  const { data, error } = await sb.from("campo_empleados").select("*").order("nombre");
+  if (error) return toast("Error al cargar empleados: " + error.message, "error");
+  empleados = data; pintarEmpleados();
+}
+["#eBuscar", "#eFiltro"].forEach(x => $(x).addEventListener("input", pintarEmpleados));
+function pintarEmpleados() {
+  const q = norm($("#eBuscar").value.trim());
+  const fil = $("#eFiltro").value;
+  const f = empleados.filter(e => (!fil || (fil === "campo" ? e.checa_campo : !e.checa_campo)) &&
+    (!q || [e.id, e.nombre, e.departamento, e.puesto].some(x => norm(x).includes(q))));
+  $("#tbEmp").innerHTML = f.map(e => `
+    <tr data-id="${esc(e.id)}" class="${e.activo ? "" : "opacity-50"}">
+      <td class="px-3 py-2 font-mono text-xs">${esc(e.id)}</td>
+      <td class="px-3 py-2">${esc(e.nombre)}</td>
+      <td class="px-3 py-2 text-xs text-muted">${esc(e.puesto)}<br>${esc(e.departamento)}</td>
+      <td class="px-3 py-2"><input type="checkbox" data-accion="campo" ${e.checa_campo ? "checked" : ""} class="w-4 h-4"></td>
+      <td class="px-3 py-2 text-xs">${e.lat != null ? `${esc(e.ubicacion_nombre || "Sin nombre")}<br><span class="text-muted">radio ${e.radio_m} m</span>` : `<span class="text-muted">Libre</span>`}</td>
+      <td class="px-3 py-2 text-xs">${e.foto_expediente ? `<span class="text-accent">Enrolado</span>` : `<span class="text-warning">Pendiente</span>`}</td>
+      <td class="px-3 py-2"><input type="checkbox" data-accion="activo" ${e.activo ? "checked" : ""} class="w-4 h-4 accent-[rgb(var(--primary))]"></td>
+      <td class="px-3 py-2 whitespace-nowrap text-right">
+        <button data-accion="ubi" class="px-2 py-1 rounded-lg border border-line text-xs">Sitio fijo</button>
+        <button data-accion="enr" class="px-2 py-1 rounded-lg bg-primary text-on-primary text-xs">Enrolar</button>
+      </td>
+    </tr>`).join("");
+}
+$("#tbEmp").addEventListener("click", async e => {
+  const el = e.target.closest("[data-accion]"); if (!el) return;
+  const emp = empleados.find(x => x.id === el.closest("tr").dataset.id);
+  if (el.dataset.accion === "activo" || el.dataset.accion === "campo") {
+    const col = el.dataset.accion === "activo" ? "activo" : "checa_campo";
+    const { error } = await sb.from("campo_empleados").update({ [col]: el.checked }).eq("id", emp.id);
+    if (error) { el.checked = !el.checked; return toast(error.message, "error"); }
+    emp[col] = el.checked; pintarEmpleados();
+  }
+  if (el.dataset.accion === "ubi") abrirUbicacion(emp);
+  if (el.dataset.accion === "enr") abrirEnrolamiento(emp);
+});
+
+// ---------- Ubicación ----------
+let mapaUbi, uMarcador, uCirculo, empUbi;
+function abrirUbicacion(emp) {
+  empUbi = emp;
+  $("#uTitulo").textContent = `Sitio fijo (opcional) · ${emp.nombre}`;
+  $("#uNombre").value = emp.ubicacion_nombre || ""; $("#uLat").value = emp.lat ?? ""; $("#uLng").value = emp.lng ?? ""; $("#uRadio").value = emp.radio_m;
+  abrir("#mUbi");
+  setTimeout(() => {
+    if (!mapaUbi) {
+      mapaUbi = L.map("uMapa");
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(mapaUbi);
+      mapaUbi.on("click", ev => { $("#uLat").value = ev.latlng.lat.toFixed(6); $("#uLng").value = ev.latlng.lng.toFixed(6); dibujarUbi(); });
+    }
+    mapaUbi.invalidateSize();
+    dibujarUbi(true);
+  }, 60);
+}
+function dibujarUbi(centrar) {
+  const lat = parseFloat($("#uLat").value), lng = parseFloat($("#uLng").value), r = parseInt($("#uRadio").value) || 150;
+  uMarcador?.remove(); uCirculo?.remove();
+  if (isFinite(lat) && isFinite(lng)) {
+    uMarcador = L.marker([lat, lng], { icon: pin("A", "primary") }).addTo(mapaUbi);
+    uCirculo = L.circle([lat, lng], { radius: r, color: css("primary"), weight: 1, fillOpacity: .1 }).addTo(mapaUbi);
+    if (centrar) mapaUbi.setView([lat, lng], 17);
+  } else if (centrar) mapaUbi.setView(C.CENTRO_MAPA, 12);
+}
+["#uLat", "#uLng", "#uRadio"].forEach(s => $(s).addEventListener("input", () => dibujarUbi(false)));
+async function guardarUbi(quitar) {
+  const lat = parseFloat($("#uLat").value), lng = parseFloat($("#uLng").value), radio = parseInt($("#uRadio").value);
+  if (!quitar && (!isFinite(lat) || !isFinite(lng))) return toast("Coloca el punto en el mapa.", "error");
+  if (!quitar && !(radio >= 10 && radio <= 5000)) return toast("El radio debe estar entre 10 y 5000 m.", "error");
+  const cambios = quitar ? { lat: null, lng: null, ubicacion_nombre: null } : { lat, lng, radio_m: radio, ubicacion_nombre: $("#uNombre").value.trim() || null };
+  const { error } = await sb.from("campo_empleados").update(cambios).eq("id", empUbi.id);
+  if (error) return toast(error.message, "error");
+  Object.assign(empUbi, cambios); pintarEmpleados(); cerrar($("#mUbi")); toast(quitar ? "Sitio libre" : "Sitio fijo guardado");
+}
+$("#uGuardar").addEventListener("click", () => guardarUbi(false));
+$("#uQuitar").addEventListener("click", () => guardarUbi(true));
+
+// ---------- Enrolamiento facial ----------
+let empEnr, webcam, fotoEnr, lienzoEnr;
+async function abrirEnrolamiento(emp) {
+  empEnr = emp; fotoEnr = null; lienzoEnr = null; Rostro.cargar().catch(() => {});
+  $("#enTitulo").textContent = `Enrolamiento facial · ${emp.nombre}`;
+  $("#enPreview").classList.add("hidden"); $("#enRepetir").classList.add("hidden"); $("#enCapturar").classList.remove("hidden");
+  $("#enGuardar").disabled = true;
+  abrir("#mEnr");
+  try {
+    webcam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 } }, audio: false });
+    $("#enVideo").srcObject = webcam;
+  } catch { toast("No hay cámara disponible; usa “Subir archivo”.", "alerta"); }
+}
+function detenerWebcam() { webcam?.getTracks().forEach(t => t.stop()); webcam = null; }
+function aJPEG(src, w, h) {
+  const k = Math.min(1, 1024 / Math.max(w, h)), c = document.createElement("canvas");
+  c.width = Math.round(w * k); c.height = Math.round(h * k);
+  c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(b => r({ blob: b, url: c.toDataURL("image/jpeg", .9), canvas: c }), "image/jpeg", .9));
+}
+async function mostrarPreview(res) {
+  fotoEnr = res.blob; lienzoEnr = res.canvas; $("#enPreview").src = res.url; $("#enPreview").classList.remove("hidden");
+  $("#enCapturar").classList.add("hidden"); $("#enRepetir").classList.remove("hidden"); $("#enGuardar").disabled = false;
+}
+$("#enCapturar").addEventListener("click", async () => {
+  const v = $("#enVideo"); if (!v.videoWidth) return toast("La cámara no está lista", "error");
+  mostrarPreview(await aJPEG(v, v.videoWidth, v.videoHeight));
+});
+$("#enArchivo").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const img = new Image(); img.src = URL.createObjectURL(f); await img.decode();
+  mostrarPreview(await aJPEG(img, img.naturalWidth, img.naturalHeight));
+});
+$("#enRepetir").addEventListener("click", () => {
+  fotoEnr = null; $("#enPreview").classList.add("hidden"); $("#enRepetir").classList.add("hidden");
+  $("#enCapturar").classList.remove("hidden"); $("#enGuardar").disabled = true;
+});
+$("#enGuardar").addEventListener("click", async () => {
+  if (!fotoEnr) return;
+  $("#enGuardar").disabled = true; $("#enGuardar").textContent = "Analizando rostro…";
+  let huella = null;
+  try { huella = await Rostro.huella(lienzoEnr); } catch { }
+  $("#enGuardar").textContent = "Guardar como foto de expediente";
+  if (!huella) { $("#enGuardar").disabled = false; return toast("No se detectó un rostro claro. Toma otra foto de frente y con buena luz.", "error"); }
+  const ruta = `expediente/${empEnr.id}.jpg`;
+  const up = await sb.storage.from(BUCKET).upload(ruta, fotoEnr, { contentType: "image/jpeg", upsert: true });
+  if (up.error) { $("#enGuardar").disabled = false; return toast("No se pudo subir: " + up.error.message, "error"); }
+  const cambios = { foto_expediente: ruta, huella, foto_actualizada_en: new Date().toISOString() };
+  const { error } = await sb.from("campo_empleados").update(cambios).eq("id", empEnr.id);
+  if (error) { $("#enGuardar").disabled = false; return toast(error.message, "error"); }
+  Object.assign(empEnr, cambios); pintarEmpleados(); cerrar($("#mEnr")); toast(`${empEnr.nombre} enrolado`);
+});
+
+// ---------- Importador masivo ----------
+const ALIAS = {
+  id: ["ID_EMPLEADO", "ID", "IDEMPLEADO", "NO_EMPLEADO", "NUMERO_EMPLEADO", "NUM_EMPLEADO"],
+  nombre: ["NOMBRE", "NOMBRE_COMPLETO", "EMPLEADO"],
+  telefono: ["TELEFONO", "CELULAR", "TEL"],
+  puesto: ["PUESTO"], departamento: ["DEPARTAMENTO", "DEPTO", "AREA"],
+  fecha_alta: ["ALTA", "FECHA_ALTA", "FECHA_DE_ALTA"],
+  ubicacion_nombre: ["UBICACION", "UBICACION_NOMBRE", "SITIO", "ESTACION", "GASOLINERA"],
+  lat: ["UBICACION_ASIGNADA_LAT", "LAT", "LATITUD"], lng: ["UBICACION_ASIGNADA_LNG", "LNG", "LON", "LONGITUD"],
+  radio_m: ["RADIO_PERMITIDO_MTS", "RADIO", "RADIO_M", "RADIO_PERMITIDO"],
+};
+const clave = s => norm(s).replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+function aFecha(v) {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  const s = String(v ?? "").trim(); if (!s) return null;
+  const m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/); if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null;
+}
+$("#eImportar").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    const wb = XLSX.read(await f.arrayBuffer(), { cellDates: true });
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true });
+    const iEnc = filas.findIndex(r => r.some(c => ALIAS.id.includes(clave(c))) && r.some(c => ALIAS.nombre.includes(clave(c))));
+    if (iEnc < 0) throw new Error("No encontré encabezados con ID y NOMBRE.");
+    const mapa = {};
+    filas[iEnc].forEach((c, i) => { for (const [k, al] of Object.entries(ALIAS)) if (al.includes(clave(c)) && !(k in mapa)) mapa[k] = i; });
+    const registros = [], errores = [];
+    filas.slice(iEnc + 1).forEach((r, n) => {
+      const id = String(r[mapa.id] ?? "").trim().toUpperCase(); if (!id) return;
+      const o = { id };
+      for (const k of Object.keys(mapa)) {
+        if (k === "id") continue;
+        let v = r[mapa[k]];
+        if (k === "fecha_alta") v = aFecha(v);
+        else if (k === "lat" || k === "lng") v = v === "" ? null : Number(v);
+        else if (k === "radio_m") v = v === "" ? 150 : parseInt(v);
+        else v = String(v ?? "").trim() || null;
+        o[k] = v;
+      }
+      if (!o.nombre) errores.push(`Fila ${iEnc + n + 2}: sin nombre`);
+      else if ((o.lat != null && !(Math.abs(o.lat) <= 90)) || (o.lng != null && !(Math.abs(o.lng) <= 180))) errores.push(`Fila ${iEnc + n + 2}: coordenadas inválidas`);
+      else if (o.radio_m != null && !(o.radio_m >= 10 && o.radio_m <= 5000)) errores.push(`Fila ${iEnc + n + 2}: radio fuera de 10–5000 m`);
+      else registros.push(o);
+    });
+    const unicos = [...new Map(registros.map(r => [r.id, r])).values()];
+    for (let i = 0; i < unicos.length; i += 500) {
+      const { error } = await sb.from("campo_empleados").upsert(unicos.slice(i, i + 500), { onConflict: "id" });
+      if (error) throw error;
+    }
+    $("#eResumen").innerHTML = `<div class="p-3 rounded-xl bg-accent/10 text-accent">${unicos.length} empleados importados/actualizados.</div>` +
+      (errores.length ? `<div class="mt-2 p-3 rounded-xl bg-danger/10 text-danger text-xs">${errores.map(esc).join("<br>")}</div>` : "");
+    cargarEmpleados();
+  } catch (err) { toast("Importación fallida: " + err.message, "error"); }
+});
+
+lucide.createIcons();
+</script>
+</body>
+</html>

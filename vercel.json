@@ -1,0 +1,8 @@
+{
+  "outputDirectory": "www",
+  "cleanUrls": false,
+  "headers": [
+    { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/(.*)", "headers": [{ "key": "Permissions-Policy", "value": "camera=(self), geolocation=(self)" }] }
+  ]
+}

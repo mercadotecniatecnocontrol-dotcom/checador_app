@@ -1,0 +1,11 @@
+{
+  "name": "checador-campo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Checador de asistencia en campo (Android APK + PWA iOS) — Tecnocontrol",
+  "dependencies": {
+    "@capacitor/android": "6.2.0",
+    "@capacitor/cli": "6.2.0",
+    "@capacitor/core": "6.2.0"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "appId": "mx.com.tecnocontrol.checadorcampo",
+  "appName": "Checador Campo",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false }
+}
