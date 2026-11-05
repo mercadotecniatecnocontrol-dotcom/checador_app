@@ -28,8 +28,9 @@
 <!-- ===== Login ===== -->
 <section id="vLogin" class="min-h-screen flex items-center justify-center p-4">
   <form id="fLogin" class="w-full max-w-sm bg-surface border border-line rounded-2xl p-6 shadow space-y-4">
-    <div class="flex items-center gap-2 text-primary"><i data-lucide="shield-check" class="w-7 h-7"></i>
-      <h1 class="text-xl font-semibold">Panel RH · Checador de Campo</h1></div>
+    <div class="flex justify-center"><img src="img/logo.png" alt="Tecnocontrol" class="h-12 w-auto" onerror="this.outerHTML='<span class=&quot;text-2xl font-extrabold text-primary&quot;>TECNO<span class=&quot;text-secondary&quot;>CONTROL</span></span>'"></div>
+    <h1 class="text-lg font-semibold text-center">Panel RH · Checador de Campo</h1>
+    <div class="h-1 w-12 bg-secondary rounded-full mx-auto"></div>
     <input id="lEmail" type="email" required placeholder="Correo" class="w-full px-3 py-2.5 rounded-lg bg-bg border border-line">
     <input id="lPass" type="password" required placeholder="Contraseña" class="w-full px-3 py-2.5 rounded-lg bg-bg border border-line">
     <button class="w-full py-2.5 rounded-lg bg-primary text-on-primary font-semibold">Entrar</button>
@@ -39,8 +40,8 @@
 
 <!-- ===== App ===== -->
 <section id="vApp" class="hidden min-h-screen flex flex-col">
-  <header class="bg-primary text-on-primary px-6 py-3 flex items-center gap-4 shadow">
-    <i data-lucide="map-pin-check" class="w-6 h-6"></i>
+  <header class="bg-primary text-on-primary px-6 py-3 flex items-center gap-4 shadow border-b-4 border-secondary">
+    <div class="bg-white rounded-lg h-10 px-2 flex items-center"><img src="img/logo.png" alt="Tecnocontrol" class="h-7 w-auto" onerror="this.parentElement.innerHTML='<span class=&quot;font-extrabold text-primary&quot;>TECNO<span class=&quot;text-secondary&quot;>CONTROL</span></span>'"></div>
     <h1 class="font-semibold text-lg flex-1">Checador de Campo · RH</h1>
     <span id="hUsuario" class="text-sm opacity-80"></span>
     <button id="btnSalir" class="text-sm px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25">Salir</button>
@@ -112,7 +113,7 @@
       <table class="w-full text-sm">
         <thead><tr class="text-left text-muted text-xs uppercase">
           <th class="px-3 py-2">ID</th><th class="px-3 py-2">Nombre</th><th class="px-3 py-2">Puesto / Depto.</th>
-          <th class="px-3 py-2">Campo</th><th class="px-3 py-2">Sitio fijo</th><th class="px-3 py-2">Biometría</th><th class="px-3 py-2">Activo</th><th class="px-3 py-2"></th>
+          <th class="px-3 py-2">Campo</th><th class="px-3 py-2">Celular</th><th class="px-3 py-2">Sitio fijo</th><th class="px-3 py-2">Biometría</th><th class="px-3 py-2">Activo</th><th class="px-3 py-2"></th>
         </tr></thead>
         <tbody id="tbEmp" class="divide-y divide-line"></tbody>
       </table>
@@ -443,9 +444,14 @@ $("#btnEnrolarCon").addEventListener("click", async () => {
 $("#btnRechazar").addEventListener("click", () => resolver("RECHAZADO"));
 
 // ================= Empleados =================
+let dispositivos = {};
 async function cargarEmpleados() {
-  const { data, error } = await sb.from("campo_empleados").select("*").order("nombre");
+  const [{ data, error }, disp] = await Promise.all([
+    sb.from("campo_empleados").select("*").order("nombre"),
+    sb.from("campo_dispositivos").select("empleado_id, plataforma, ultimo_uso"),
+  ]);
   if (error) return toast("Error al cargar empleados: " + error.message, "error");
+  dispositivos = Object.fromEntries((disp.data || []).map(d => [d.empleado_id, d]));
   empleados = data; pintarEmpleados();
 }
 ["#eBuscar", "#eFiltro"].forEach(x => $(x).addEventListener("input", pintarEmpleados));
@@ -460,6 +466,7 @@ function pintarEmpleados() {
       <td class="px-3 py-2">${esc(e.nombre)}</td>
       <td class="px-3 py-2 text-xs text-muted">${esc(e.puesto)}<br>${esc(e.departamento)}</td>
       <td class="px-3 py-2"><input type="checkbox" data-accion="campo" ${e.checa_campo ? "checked" : ""} class="w-4 h-4"></td>
+      <td class="px-3 py-2 text-xs">${dispositivos[e.id] ? `<span class="text-accent">Vinculado</span><br><span class="text-muted">${esc(dispositivos[e.id].plataforma || "")}</span> <button data-accion="liberar" class="ml-1 underline text-secondary">Liberar</button>` : `<span class="text-muted">Sin vincular</span>`}</td>
       <td class="px-3 py-2 text-xs">${e.lat != null ? `${esc(e.ubicacion_nombre || "Sin nombre")}<br><span class="text-muted">radio ${e.radio_m} m</span>` : `<span class="text-muted">Libre</span>`}</td>
       <td class="px-3 py-2 text-xs">${e.foto_expediente ? `<span class="text-accent">Enrolado</span>` : `<span class="text-warning">Pendiente</span>`}</td>
       <td class="px-3 py-2"><input type="checkbox" data-accion="activo" ${e.activo ? "checked" : ""} class="w-4 h-4 accent-[rgb(var(--primary))]"></td>
@@ -477,6 +484,12 @@ $("#tbEmp").addEventListener("click", async e => {
     const { error } = await sb.from("campo_empleados").update({ [col]: el.checked }).eq("id", emp.id);
     if (error) { el.checked = !el.checked; return toast(error.message, "error"); }
     emp[col] = el.checked; pintarEmpleados();
+  }
+  if (el.dataset.accion === "liberar") {
+    if (!confirm(`¿Liberar el celular de ${emp.nombre}? Podrá vincular uno nuevo en su siguiente checada.`)) return;
+    const { error } = await sb.from("campo_dispositivos").delete().eq("empleado_id", emp.id);
+    if (error) return toast(error.message, "error");
+    delete dispositivos[emp.id]; pintarEmpleados(); toast("Celular liberado");
   }
   if (el.dataset.accion === "ubi") abrirUbicacion(emp);
   if (el.dataset.accion === "enr") abrirEnrolamiento(emp);

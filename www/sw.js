@@ -1,4 +1,4 @@
-const CACHE = "checador-campo-v2";
+const CACHE = "checador-campo-v3";
 const SHELL = ["./", "./index.html", "./js/config.js", "./js/theme.js", "./js/rostro.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-180.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });

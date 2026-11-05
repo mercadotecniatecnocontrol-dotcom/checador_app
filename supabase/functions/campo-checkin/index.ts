@@ -53,6 +53,9 @@ Deno.serve(async (req) => {
   const plataforma = String(b.plataforma ?? "web").slice(0, 20);
   const fotoB64 = String(b.fotoBase64 ?? "").split(",").pop() ?? "";
   const huella = esHuella(b.huella) ? b.huella : null;
+  const pruebaVida = b.pruebaVida === true;
+  const dispositivoId = String(b.dispositivoId ?? "").trim().slice(0, 64);
+  const modelo = String(b.modelo ?? "").slice(0, 200);
 
   if (!id || ![lat, lng, precision].every(Number.isFinite) || Math.abs(lat) > 90 || Math.abs(lng) > 180)
     return json({ error: "Datos incompletos" }, 400);
@@ -68,6 +71,15 @@ Deno.serve(async (req) => {
   if (eEmp) return json({ error: "Error al consultar empleado" }, 500);
   if (!emp) return json({ error: "Empleado no encontrado o inactivo" }, 404);
   if (!emp.checa_campo) return json({ error: "Este empleado no está autorizado para checar en campo" }, 403);
+
+  // Celular vinculado: 1 empleado = 1 celular y 1 celular = 1 empleado.
+  if (!/^[0-9a-f-]{36}$/i.test(dispositivoId)) return json({ error: "Este celular no se pudo identificar. Actualiza la app." }, 400);
+  const { data: delCel } = await sb.from("campo_dispositivos").select("empleado_id").eq("dispositivo_id", dispositivoId).maybeSingle();
+  if (delCel && delCel.empleado_id !== id)
+    return json({ error: "Este celular está vinculado a otro técnico. Solo puedes checar desde tu propio celular." }, 403);
+  const { data: delEmp } = await sb.from("campo_dispositivos").select("dispositivo_id").eq("empleado_id", id).maybeSingle();
+  if (delEmp && delEmp.dispositivo_id !== dispositivoId)
+    return json({ error: "Tu número de empleado está vinculado a otro celular. Pide a RH que lo libere para usar este." }, 403);
 
   const { data: reciente } = await sb.from("campo_asistencias").select("id")
     .eq("empleado_id", id).gte("ts_servidor", new Date(Date.now() - ESPERA_MIN * 60_000).toISOString()).limit(1);
@@ -100,6 +112,8 @@ Deno.serve(async (req) => {
     if (similitud < UMBRAL_ROSTRO) causas.push(`Rostro no coincide (${similitud.toFixed(1)}%)`);
   }
 
+  if (!pruebaVida) causas.push("Sin prueba de vida (foto de respaldo)");
+
   // 3) Estatus
   const estatus = causas.length ? "PENDIENTE_APROBACION_RH" : "APROBADO_AUTOMATICO";
 
@@ -109,9 +123,14 @@ Deno.serve(async (req) => {
     asig_lat: emp.lat, asig_lng: emp.lng, radio_m: emp.radio_m, ubicacion_nombre: emp.ubicacion_nombre,
     distancia_m: distancia, similitud, distancia_rostro: distRostro,
     foto_path: fotoPath, expediente_path: emp.foto_expediente,
-    plataforma, estatus, causas,
+    plataforma, estatus, causas, dispositivo_id: dispositivoId, prueba_vida: pruebaVida,
   }).select("id, estatus, causas, ts_servidor, distancia_m, similitud").single();
 
   if (error) { console.error(error); return json({ error: "No se pudo registrar la checada" }, 500); }
+
+  // Vincula o actualiza el celular (primera checada = queda registrado a este empleado)
+  await sb.from("campo_dispositivos").upsert(
+    { empleado_id: id, dispositivo_id: dispositivoId, plataforma, modelo, ultimo_uso: new Date().toISOString() },
+    { onConflict: "empleado_id" });
   return json({ ...data, nombre: emp.nombre });
 });

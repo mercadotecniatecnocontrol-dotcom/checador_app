@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0054A6">
+<meta name="theme-color" content="#1D2E73">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<title>Checador de Campo</title>
+<title>Checador de Campo · Tecnocontrol</title>
 <script src="js/config.js"></script>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="js/theme.js"></script>
@@ -21,33 +21,42 @@
 <script src="js/rostro.js"></script>
 <style>
   html,body{height:100%}
-  body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);-webkit-tap-highlight-color:transparent}
+  body{padding-bottom:env(safe-area-inset-bottom);-webkit-tap-highlight-color:transparent}
   .vista{display:none}.vista.activa{display:flex}
   video{transform:scaleX(-1)}
+  .modal{display:none}.modal.abierto{display:flex}
+  @keyframes subir{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+  .subir{animation:subir .22s ease-out}
+  .aro{transition:stroke-dashoffset .3s ease}
 </style>
 </head>
 <body class="font-sans antialiased">
 <div class="max-w-md mx-auto min-h-full flex flex-col">
 
-  <header class="bg-primary text-on-primary px-5 py-4 flex items-center gap-3 shadow">
-    <i data-lucide="map-pin-check" class="w-6 h-6"></i>
-    <div class="flex-1">
-      <h1 class="font-semibold leading-tight">Checador de Campo</h1>
-      <p class="text-xs opacity-80" id="hEmpresa"></p>
+  <header class="bg-primary text-white px-5 pb-4 shadow-lg" style="padding-top:calc(env(safe-area-inset-top) + 14px)">
+    <div class="flex items-center gap-3">
+      <div class="bg-white rounded-xl h-11 px-2 flex items-center justify-center shrink-0">
+        <img src="img/logo.png" alt="Tecnocontrol" class="h-8 w-auto" onerror="this.parentElement.innerHTML='<span class=&quot;font-extrabold text-primary tracking-tight&quot;>TECNO<span class=&quot;text-secondary&quot;>CONTROL</span></span>'">
+      </div>
+      <div class="flex-1 min-w-0">
+        <h1 class="font-semibold leading-tight">Checador de Campo</h1>
+        <p class="text-xs text-white/70">Registro de asistencia con foto y ubicación</p>
+      </div>
     </div>
   </header>
+  <div class="h-1 bg-secondary"></div>
 
-  <!-- Aviso instalación iOS -->
-  <div id="avisoIOS" class="hidden m-4 p-3 rounded-xl bg-secondary/15 border border-secondary/40 text-sm">
+  <div id="avisoIOS" class="hidden m-4 p-3 rounded-xl bg-primary/10 border border-primary/30 text-sm">
     Para usarla como app: toca <b>Compartir</b> <i data-lucide="share" class="inline w-4 h-4"></i> y luego <b>Agregar a pantalla de inicio</b>.
   </div>
 
-  <!-- 1. Selección de empleado -->
+  <!-- 1. Selección -->
   <section id="vSeleccion" class="vista activa flex-col flex-1 p-4 gap-3">
     <h2 class="text-lg font-semibold">¿Quién va a checar?</h2>
+    <p class="text-sm text-muted -mt-2">Busca tu nombre o número de empleado. Este celular quedará registrado a tu nombre.</p>
     <div class="relative">
       <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3.5 text-muted"></i>
-      <input id="buscar" type="search" autocomplete="off" placeholder="ID o nombre"
+      <input id="buscar" type="search" autocomplete="off" placeholder="Número o nombre"
         class="w-full pl-9 pr-3 py-3 rounded-xl bg-surface border border-line focus:outline-none focus:ring-2 focus:ring-primary">
     </div>
     <div id="lista" class="flex-1 overflow-y-auto rounded-xl bg-surface border border-line divide-y divide-line min-h-[200px]">
@@ -57,16 +66,16 @@
 
   <!-- 2. Checar -->
   <section id="vChecar" class="vista flex-col flex-1 p-4 gap-3">
-    <div class="flex items-center gap-3 bg-surface border border-line rounded-xl p-3">
-      <div class="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold" id="cIniciales"></div>
+    <div class="flex items-center gap-3 bg-surface border border-line rounded-2xl p-3 shadow-sm">
+      <div class="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center font-semibold" id="cIniciales"></div>
       <div class="flex-1 min-w-0">
         <p class="font-semibold truncate" id="cNombre"></p>
         <p class="text-xs text-muted truncate" id="cPuesto"></p>
       </div>
-      <button id="btnCambiar" class="text-sm text-primary font-medium">Cambiar</button>
+      <span class="flex items-center gap-1 text-[11px] text-accent font-medium"><i data-lucide="smartphone" class="w-3.5 h-3.5"></i>Vinculado</span>
     </div>
 
-    <div id="gpsCaja" class="flex items-center gap-3 rounded-xl p-3 border border-line bg-surface">
+    <div class="flex items-center gap-3 rounded-2xl p-3 border border-line bg-surface">
       <i data-lucide="satellite" class="w-5 h-5 text-muted"></i>
       <div class="flex-1">
         <p class="text-sm font-medium" id="gpsTexto">Buscando señal GPS…</p>
@@ -75,22 +84,29 @@
       <span id="gpsPunto" class="w-3 h-3 rounded-full bg-warning animate-pulse"></span>
     </div>
 
-    <div class="relative rounded-2xl overflow-hidden bg-black aspect-[3/4]">
+    <div class="relative rounded-2xl overflow-hidden bg-black aspect-[3/4] shadow">
       <video id="video" autoplay playsinline muted class="w-full h-full object-cover"></video>
       <div id="camAviso" class="absolute inset-0 flex items-center justify-center text-white/80 text-sm p-6 text-center">Activando cámara…</div>
-      <p class="absolute bottom-2 inset-x-0 text-center text-white/90 text-xs drop-shadow">Que se vea tu rostro y el lugar de servicio</p>
+      <!-- Prueba de vida -->
+      <div id="reto" class="hidden absolute inset-0 flex flex-col items-center justify-end pb-6 bg-gradient-to-t from-black/70 via-transparent to-transparent">
+        <div class="bg-white/95 text-primary rounded-2xl px-4 py-3 flex items-center gap-3 shadow-lg mx-4">
+          <svg class="w-10 h-10 -rotate-90" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#e2e8f0" stroke-width="4"/><circle id="retoAro" class="aro" cx="18" cy="18" r="15" fill="none" stroke="#E7402B" stroke-width="4" stroke-dasharray="94.2" stroke-dashoffset="94.2" stroke-linecap="round"/></svg>
+          <div><p class="text-xs text-muted">Prueba de vida</p><p id="retoTexto" class="font-semibold">Mira de frente a la cámara</p></div>
+        </div>
+      </div>
+      <p id="pieCam" class="absolute bottom-2 inset-x-0 text-center text-white/90 text-xs drop-shadow">Que se vea tu rostro y el lugar de servicio</p>
     </div>
 
-    <!-- Respaldo si el navegador no permite video en vivo: cámara frontal, sin galería -->
     <label id="respaldo" class="hidden w-full text-center py-3 rounded-xl border-2 border-dashed border-primary text-primary font-medium">
       <input id="inputFoto" type="file" accept="image/*" capture="user" class="hidden">
       Tomar selfie con la cámara
     </label>
 
     <button id="btnChecar" disabled
-      class="w-full py-4 rounded-2xl bg-primary text-on-primary text-lg font-semibold shadow disabled:opacity-40 flex items-center justify-center gap-2">
-      <i data-lucide="fingerprint" class="w-6 h-6"></i><span>Checar</span>
+      class="w-full py-4 rounded-2xl bg-secondary text-white text-lg font-semibold shadow-lg disabled:opacity-40 flex items-center justify-center gap-2 active:scale-[.98] transition">
+      <i data-lucide="scan-face" class="w-6 h-6"></i><span>Checar</span>
     </button>
+    <button id="btnCambiar" class="text-xs text-muted underline self-center">No soy esta persona</button>
   </section>
 
   <!-- 3. Resultado -->
@@ -100,11 +116,36 @@
     <p id="rHora" class="text-muted"></p>
     <ul id="rCausas" class="text-sm text-left w-full space-y-2"></ul>
     <img id="rFoto" class="w-32 h-32 object-cover rounded-xl border border-line" alt="">
-    <button id="btnListo" class="w-full py-4 rounded-2xl bg-primary text-on-primary font-semibold">Listo</button>
+    <button id="btnListo" class="w-full py-4 rounded-2xl bg-primary text-white font-semibold">Listo</button>
   </section>
-
-  <div id="toast" class="hidden fixed bottom-6 inset-x-4 max-w-md mx-auto p-3 rounded-xl bg-danger text-white text-sm shadow-lg"></div>
 </div>
+
+<!-- Confirmación de identidad -->
+<div id="mConfirmar" class="modal fixed inset-0 z-50 bg-black/60 items-end sm:items-center justify-center p-4">
+  <div class="subir w-full max-w-sm bg-surface rounded-3xl shadow-2xl overflow-hidden">
+    <div class="bg-primary px-6 pt-6 pb-10 text-center text-white relative">
+      <p class="text-xs uppercase tracking-widest text-white/70">Confirma tu identidad</p>
+      <div class="h-1 w-10 bg-secondary rounded-full mx-auto mt-2"></div>
+    </div>
+    <div class="-mt-8 flex justify-center">
+      <div id="mcIniciales" class="w-16 h-16 rounded-full bg-white border-4 border-surface shadow text-primary text-xl font-bold flex items-center justify-center"></div>
+    </div>
+    <div class="px-6 pt-3 pb-6 text-center">
+      <p id="mcNombre" class="text-lg font-semibold leading-tight"></p>
+      <p id="mcPuesto" class="text-sm text-muted mt-1"></p>
+      <div class="mt-4 p-3 rounded-xl bg-secondary/10 text-left text-xs text-fg flex gap-2">
+        <i data-lucide="shield-alert" class="w-4 h-4 text-secondary shrink-0 mt-0.5"></i>
+        <span>Este celular quedará vinculado a tu nombre. Solo tú podrás checar desde aquí y cada checada se valida con tu rostro. Checar por otra persona es una falta grave.</span>
+      </div>
+      <div class="mt-5 grid grid-cols-2 gap-3">
+        <button id="mcNo" class="py-3 rounded-xl border border-line font-medium">No soy yo</button>
+        <button id="mcSi" class="py-3 rounded-xl bg-primary text-white font-semibold">Sí, soy yo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden fixed bottom-6 inset-x-4 max-w-md mx-auto p-3 rounded-xl bg-secondary text-white text-sm shadow-lg z-50"></div>
 
 <script>
 const C = window.APP_CONFIG;
@@ -115,9 +156,17 @@ const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platfor
 const PLATAFORMA = esNativo ? "android-apk" : esIOS ? "ios-web" : "web";
 const MAX_ACC = C.PRECISION_MAX_M;
 
-let empleados = [], empleado = null, pos = null, gpsWatch = null, stream = null, enviando = false, modelosOK = false;
+// Identificador de este celular (se crea una vez y se queda guardado)
+const DISPOSITIVO = (() => {
+  try {
+    let d = localStorage.getItem("campo_dispositivo");
+    if (!d) { d = crypto.randomUUID(); localStorage.setItem("campo_dispositivo", d); }
+    return d;
+  } catch { return "sin-almacenamiento"; }
+})();
 
-$("#hEmpresa").textContent = C.EMPRESA;
+let empleados = [], empleado = null, elegido = null, pos = null, gpsWatch = null, stream = null, enviando = false, modelosOK = false;
+
 lucide.createIcons();
 
 function vista(id) {
@@ -126,10 +175,11 @@ function vista(id) {
 }
 function toast(msg) {
   const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden");
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), 5000);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), 6000);
 }
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+const iniciales = n => n.split(" ").filter(Boolean).slice(0, 2).map(p => p[0]).join("");
 
 // ---------- Selección ----------
 async function cargarEmpleados() {
@@ -145,15 +195,25 @@ function pintarLista() {
       <span class="text-xs font-mono px-2 py-1 rounded bg-primary/10 text-primary">${esc(e.id)}</span>
       <span class="flex-1 min-w-0"><span class="block truncate">${esc(e.nombre)}</span>
       <span class="block text-xs text-muted truncate">${esc(e.puesto)}</span></span>
+      <i data-lucide="chevron-right" class="w-4 h-4 text-muted"></i>
     </button>`).join("") : `<p class="p-4 text-muted text-sm">Sin resultados</p>`;
+  lucide.createIcons();
 }
 $("#buscar").addEventListener("input", pintarLista);
 $("#lista").addEventListener("click", e => {
   const b = e.target.closest("button[data-id]"); if (!b) return;
-  const emp = empleados.find(x => x.id === b.dataset.id);
-  if (!confirm(`¿Eres ${emp.nombre}?`)) return;
-  try { localStorage.setItem("campo_empleado", JSON.stringify(emp)); } catch {}
-  abrirChecar(emp);
+  elegido = empleados.find(x => x.id === b.dataset.id);
+  $("#mcIniciales").textContent = iniciales(elegido.nombre);
+  $("#mcNombre").textContent = elegido.nombre;
+  $("#mcPuesto").textContent = `${elegido.id} · ${elegido.puesto ?? ""}`;
+  $("#mConfirmar").classList.add("abierto");
+});
+$("#mcNo").addEventListener("click", () => { elegido = null; $("#mConfirmar").classList.remove("abierto"); });
+$("#mConfirmar").addEventListener("click", e => { if (e.target.id === "mConfirmar") $("#mcNo").click(); });
+$("#mcSi").addEventListener("click", () => {
+  $("#mConfirmar").classList.remove("abierto");
+  try { localStorage.setItem("campo_empleado", JSON.stringify(elegido)); } catch {}
+  abrirChecar(elegido);
 });
 $("#btnCambiar").addEventListener("click", () => {
   detener(); try { localStorage.removeItem("campo_empleado"); } catch {}
@@ -165,15 +225,16 @@ function abrirChecar(emp) {
   empleado = emp;
   $("#cNombre").textContent = emp.nombre;
   $("#cPuesto").textContent = `${emp.id} · ${emp.puesto ?? ""}`;
-  $("#cIniciales").textContent = emp.nombre.split(" ").slice(0, 2).map(p => p[0]).join("");
+  $("#cIniciales").textContent = iniciales(emp.nombre);
   vista("vChecar");
   iniciarGPS(); iniciarCamara(); prepararRostro();
 }
 async function prepararRostro() {
   if (modelosOK) return;
   $("#btnChecar span").textContent = "Preparando reconocimiento…";
-  try { await Rostro.cargar(); modelosOK = true; $("#btnChecar span").textContent = "Checar"; }
-  catch { $("#btnChecar span").textContent = "Checar"; toast("No se pudo preparar el reconocimiento facial. Revisa tu internet."); setTimeout(prepararRostro, 8000); }
+  try { await Rostro.cargar(); modelosOK = true; }
+  catch { toast("No se pudo preparar el reconocimiento facial. Revisa tu internet."); setTimeout(prepararRostro, 8000); }
+  if (!enviando) $("#btnChecar span").textContent = "Checar";
   actualizarBoton();
 }
 
@@ -227,13 +288,60 @@ function aCanvas(fuente, w, h) {
   return c;
 }
 
-$("#btnChecar").addEventListener("click", () => {
+// ---------- Prueba de vida: mirar de frente → girar la cabeza → volver al frente ----------
+function giro(det) {
+  const lm = det.landmarks, nariz = lm.getNose()[3];
+  const prom = pts => pts.reduce((a, p) => ({ x: a.x + p.x / pts.length, y: a.y + p.y / pts.length }), { x: 0, y: 0 });
+  const oi = prom(lm.getLeftEye()), od = prom(lm.getRightEye());
+  const ancho = Math.hypot(od.x - oi.x, od.y - oi.y) || 1;
+  return (nariz.x - (oi.x + od.x) / 2) / ancho;
+}
+function pasoReto(texto, avance) {
+  $("#retoTexto").textContent = texto;
+  $("#retoAro").style.strokeDashoffset = String(94.2 * (1 - avance));
+}
+async function pruebaDeVida(v) {
+  const opc = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.45 });
+  const pasos = [
+    { t: "Mira de frente a la cámara", ok: g => Math.abs(g) < 0.12 },
+    { t: "Gira la cabeza hacia un lado", ok: g => Math.abs(g) > 0.28 },
+    { t: "Vuelve a mirar de frente", ok: g => Math.abs(g) < 0.12 },
+  ];
+  $("#reto").classList.remove("hidden"); $("#pieCam").classList.add("hidden");
+  const limite = Date.now() + 15000;
+  let i = 0, rostros = 0;
+  try {
+    while (i < pasos.length) {
+      if (Date.now() > limite) throw new Error("No se completó la prueba de vida. Intenta de nuevo siguiendo las indicaciones.");
+      pasoReto(pasos[i].t, i / pasos.length);
+      const dets = await faceapi.detectAllFaces(v, opc).withFaceLandmarks();
+      if (dets.length > 1) rostros = Math.max(rostros, dets.length);
+      if (dets.length) {
+        dets.sort((a, b) => b.detection.box.area - a.detection.box.area);
+        if (pasos[i].ok(giro(dets[0]))) i++;
+      }
+      await new Promise(r => setTimeout(r, 120));
+    }
+    pasoReto("¡Listo!", 1);
+    return aCanvas(v, v.videoWidth, v.videoHeight); // foto final, de frente
+  } finally {
+    setTimeout(() => { $("#reto").classList.add("hidden"); $("#pieCam").classList.remove("hidden"); }, 400);
+  }
+}
+
+$("#btnChecar").addEventListener("click", async () => {
   const v = $("#video");
   if (!v.videoWidth) return toast("La cámara aún no está lista");
-  enviar(aCanvas(v, v.videoWidth, v.videoHeight));
+  if (enviando) return;
+  enviando = true; actualizarBoton(); $("#btnChecar span").textContent = "Sigue las indicaciones…";
+  let lienzo;
+  try { lienzo = await pruebaDeVida(v); }
+  catch (e) { toast(e.message); enviando = false; $("#btnChecar span").textContent = "Checar"; actualizarBoton(); return; }
+  enviando = false;
+  enviar(lienzo, true);
 });
 
-// Respaldo: solo se aceptan fotos recién tomadas (una foto de galería trae fecha antigua)
+// Respaldo (sin video en vivo): solo fotos recién tomadas; llega a RH como "sin prueba de vida"
 $("#inputFoto").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = "";
   if (!f) return;
@@ -241,10 +349,10 @@ $("#inputFoto").addEventListener("change", async e => {
   if (!gpsValido()) return toast("Espera a que la ubicación esté lista.");
   if (!modelosOK) return toast("Espera a que termine de prepararse el reconocimiento.");
   const img = new Image(); img.src = URL.createObjectURL(f); await img.decode();
-  enviar(aCanvas(img, img.naturalWidth, img.naturalHeight));
+  enviar(aCanvas(img, img.naturalWidth, img.naturalHeight), false);
 });
 
-async function enviar(lienzo) {
+async function enviar(lienzo, pruebaVida) {
   if (enviando) return;
   if (!gpsValido()) return toast("La ubicación no tiene la precisión requerida.");
   enviando = true; actualizarBoton();
@@ -257,7 +365,11 @@ async function enviar(lienzo) {
     const r = await fetch(`${C.SUPABASE_URL}/functions/v1/${C.FUNCION_CHECKIN}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: C.SUPABASE_ANON_KEY, Authorization: `Bearer ${C.SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ idEmpleado: empleado.id, latitud: pos.lat, longitud: pos.lng, precision: pos.acc, fotoBase64: foto, huella, plataforma: PLATAFORMA })
+      body: JSON.stringify({
+        idEmpleado: empleado.id, latitud: pos.lat, longitud: pos.lng, precision: pos.acc,
+        fotoBase64: foto, huella, pruebaVida, dispositivoId: DISPOSITIVO, plataforma: PLATAFORMA,
+        modelo: navigator.userAgent.slice(0, 200)
+      })
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || `Error ${r.status}`);
