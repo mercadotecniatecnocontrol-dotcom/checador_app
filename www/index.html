@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1D2E73">
+<meta name="theme-color" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Checador">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
@@ -33,18 +33,16 @@
 <body class="font-sans antialiased">
 <div class="max-w-md mx-auto min-h-full flex flex-col">
 
-  <header class="bg-primary text-white px-5 pb-4 shadow-lg" style="padding-top:calc(env(safe-area-inset-top) + 14px)">
-    <div class="flex items-center gap-3">
-      <div class="bg-white rounded-xl h-11 px-2 flex items-center justify-center shrink-0">
-        <img src="img/logo.png" alt="Tecnocontrol" class="h-8 w-auto" onerror="this.parentElement.innerHTML='<span class=&quot;font-extrabold text-primary tracking-tight&quot;>TECNO<span class=&quot;text-secondary&quot;>CONTROL</span></span>'">
-      </div>
-      <div class="flex-1 min-w-0">
-        <h1 class="font-semibold leading-tight">Checador de Campo</h1>
-        <p class="text-xs text-white/70">Registro de asistencia con foto y ubicación</p>
+  <header class="bg-white shadow-sm" style="padding-top:env(safe-area-inset-top)">
+    <div class="px-5 py-3 flex items-center justify-between gap-3">
+      <img src="img/logo.png" alt="Tecnocontrol" class="h-9 w-auto">
+      <div class="text-right leading-tight">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-primary">Checador de campo</p>
+        <p class="text-[10px] text-slate-500">Asistencia con foto y ubicación</p>
       </div>
     </div>
+    <div class="h-1.5 bg-gradient-to-r from-primary via-profundo to-secondary"></div>
   </header>
-  <div class="h-1 bg-secondary"></div>
 
   <div id="avisoIOS" class="hidden m-4 p-3 rounded-xl bg-primary/10 border border-primary/30 text-sm">
     Para usarla como app: toca <b>Compartir</b> <i data-lucide="share" class="inline w-4 h-4"></i> y luego <b>Agregar a pantalla de inicio</b>.
@@ -67,12 +65,12 @@
   <!-- 2. Checar -->
   <section id="vChecar" class="vista flex-col flex-1 p-4 gap-3">
     <div class="flex items-center gap-3 bg-surface border border-line rounded-2xl p-3 shadow-sm">
-      <div class="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center font-semibold" id="cIniciales"></div>
+      <div class="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-profundo text-white flex items-center justify-center font-semibold" id="cIniciales"></div>
       <div class="flex-1 min-w-0">
         <p class="font-semibold truncate" id="cNombre"></p>
         <p class="text-xs text-muted truncate" id="cPuesto"></p>
       </div>
-      <span class="flex items-center gap-1 text-[11px] text-accent font-medium"><i data-lucide="smartphone" class="w-3.5 h-3.5"></i>Vinculado</span>
+      <span id="cVinculado" class="hidden flex items-center gap-1 text-[11px] text-accent font-medium"><i data-lucide="smartphone" class="w-3.5 h-3.5"></i>Vinculado</span>
     </div>
 
     <div class="flex items-center gap-3 rounded-2xl p-3 border border-line bg-surface">
@@ -90,7 +88,7 @@
       <!-- Prueba de vida -->
       <div id="reto" class="hidden absolute inset-0 flex flex-col items-center justify-end pb-6 bg-gradient-to-t from-black/70 via-transparent to-transparent">
         <div class="bg-white/95 text-primary rounded-2xl px-4 py-3 flex items-center gap-3 shadow-lg mx-4">
-          <svg class="w-10 h-10 -rotate-90" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#e2e8f0" stroke-width="4"/><circle id="retoAro" class="aro" cx="18" cy="18" r="15" fill="none" stroke="#E7402B" stroke-width="4" stroke-dasharray="94.2" stroke-dashoffset="94.2" stroke-linecap="round"/></svg>
+          <svg class="w-10 h-10 -rotate-90" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#e2e8f0" stroke-width="4"/><circle id="retoAro" class="aro" cx="18" cy="18" r="15" fill="none" stroke="#CC1028" stroke-width="4" stroke-dasharray="94.2" stroke-dashoffset="94.2" stroke-linecap="round"/></svg>
           <div><p class="text-xs text-muted">Prueba de vida</p><p id="retoTexto" class="font-semibold">Mira de frente a la cámara</p></div>
         </div>
       </div>
@@ -116,22 +114,21 @@
     <p id="rHora" class="text-muted"></p>
     <ul id="rCausas" class="text-sm text-left w-full space-y-2"></ul>
     <img id="rFoto" class="w-32 h-32 object-cover rounded-xl border border-line" alt="">
-    <button id="btnListo" class="w-full py-4 rounded-2xl bg-primary text-white font-semibold">Listo</button>
+    <button id="btnListo" class="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-profundo text-white font-semibold">Listo</button>
   </section>
 </div>
 
 <!-- Confirmación de identidad -->
 <div id="mConfirmar" class="modal fixed inset-0 z-50 bg-black/60 items-end sm:items-center justify-center p-4">
-  <div class="subir w-full max-w-sm bg-surface rounded-3xl shadow-2xl overflow-hidden">
-    <div class="bg-primary px-6 pt-6 pb-10 text-center text-white relative">
-      <p class="text-xs uppercase tracking-widest text-white/70">Confirma tu identidad</p>
-      <div class="h-1 w-10 bg-secondary rounded-full mx-auto mt-2"></div>
+  <div class="subir w-full max-w-sm bg-surface rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto">
+    <div class="bg-white px-6 pt-5 pb-0 flex flex-col items-center">
+      <img src="img/logo.png" alt="Tecnocontrol" class="h-10 w-auto">
+      <div class="mt-4 h-1.5 w-full -mx-6 bg-gradient-to-r from-primary via-profundo to-secondary" style="width:calc(100% + 3rem)"></div>
     </div>
-    <div class="-mt-8 flex justify-center">
-      <div id="mcIniciales" class="w-16 h-16 rounded-full bg-white border-4 border-surface shadow text-primary text-xl font-bold flex items-center justify-center"></div>
-    </div>
-    <div class="px-6 pt-3 pb-6 text-center">
-      <p id="mcNombre" class="text-lg font-semibold leading-tight"></p>
+    <div class="px-6 pt-5 pb-6 text-center">
+      <p class="text-[11px] uppercase tracking-[.2em] text-muted">Confirma tu identidad</p>
+      <div id="mcIniciales" class="mt-3 mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-primary to-profundo text-white text-xl font-bold flex items-center justify-center shadow-lg ring-4 ring-primary/15"></div>
+      <p id="mcNombre" class="mt-3 text-lg font-semibold leading-tight"></p>
       <p id="mcPuesto" class="text-sm text-muted mt-1"></p>
       <div class="mt-4 p-3 rounded-xl bg-secondary/10 text-left text-xs text-fg flex gap-2">
         <i data-lucide="shield-alert" class="w-4 h-4 text-secondary shrink-0 mt-0.5"></i>
@@ -139,7 +136,7 @@
       </div>
       <div class="mt-5 grid grid-cols-2 gap-3">
         <button id="mcNo" class="py-3 rounded-xl border border-line font-medium">No soy yo</button>
-        <button id="mcSi" class="py-3 rounded-xl bg-primary text-white font-semibold">Sí, soy yo</button>
+        <button id="mcSi" class="py-3 rounded-xl bg-gradient-to-r from-primary to-profundo text-white font-semibold shadow">Sí, soy yo</button>
       </div>
     </div>
   </div>
@@ -215,10 +212,29 @@ $("#mcSi").addEventListener("click", () => {
   try { localStorage.setItem("campo_empleado", JSON.stringify(elegido)); } catch {}
   abrirChecar(elegido);
 });
-$("#btnCambiar").addEventListener("click", () => {
-  detener(); try { localStorage.removeItem("campo_empleado"); } catch {}
+function olvidarEmpleado(aviso) {
+  detener();
+  try { localStorage.removeItem("campo_empleado"); localStorage.removeItem("campo_vinculado"); } catch {}
   empleado = null; $("#buscar").value = ""; pintarLista(); vista("vSeleccion");
-});
+  if (aviso) toast(aviso);
+}
+$("#btnCambiar").addEventListener("click", () => olvidarEmpleado());
+
+// Revisa si el técnico guardado sigue vigente en este celular (baja o celular liberado por RH)
+async function revisarVigencia(emp) {
+  let estado = null;
+  try {
+    const { data, error } = await sb.rpc("campo_estado_dispositivo", { p_dispositivo: DISPOSITIVO, p_empleado: emp.id });
+    if (!error) estado = data;
+  } catch {}
+  let vinculadoAqui = null;
+  try { vinculadoAqui = localStorage.getItem("campo_vinculado"); } catch {}
+  if (estado === "baja") return olvidarEmpleado(`${emp.nombre} ya no está habilitado para checar en campo. Selecciona tu nombre.`), false;
+  if (estado === "otro") return olvidarEmpleado("Este celular está vinculado a otro técnico. Selecciona tu nombre."), false;
+  if (estado === "libre" && vinculadoAqui === emp.id) return olvidarEmpleado("RH liberó este celular. Selecciona tu nombre para vincularlo."), false;
+  $("#cVinculado").classList.toggle("hidden", estado !== "vinculado");
+  return true;
+}
 
 // ---------- Checar ----------
 function abrirChecar(emp) {
@@ -226,8 +242,10 @@ function abrirChecar(emp) {
   $("#cNombre").textContent = emp.nombre;
   $("#cPuesto").textContent = `${emp.id} · ${emp.puesto ?? ""}`;
   $("#cIniciales").textContent = iniciales(emp.nombre);
+  $("#cVinculado").classList.add("hidden");
   vista("vChecar");
   iniciarGPS(); iniciarCamara(); prepararRostro();
+  revisarVigencia(emp);
 }
 async function prepararRostro() {
   if (modelosOK) return;
@@ -372,7 +390,11 @@ async function enviar(lienzo, pruebaVida) {
       })
     });
     const d = await r.json().catch(() => ({}));
+    if (r.status === 404 || (r.status === 403 && /no está autorizado/.test(d.error || ""))) {
+      olvidarEmpleado(d.error || "Este técnico ya no está habilitado."); return;
+    }
     if (!r.ok) throw new Error(d.error || `Error ${r.status}`);
+    try { localStorage.setItem("campo_vinculado", empleado.id); } catch {}
     detener(); mostrarResultado(d, foto);
   } catch (e) {
     toast(e.message === "Failed to fetch" ? "Sin conexión. Intenta de nuevo." : e.message);
@@ -397,7 +419,7 @@ $("#btnListo").addEventListener("click", () => abrirChecar(empleado));
 // ---------- Arranque ----------
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) detener();
-  else if (empleado && $("#vChecar").classList.contains("activa")) { iniciarGPS(); iniciarCamara(); }
+  else if (empleado && $("#vChecar").classList.contains("activa")) { iniciarGPS(); iniciarCamara(); revisarVigencia(empleado); }
 });
 if (esIOS && !esNativo && !navigator.standalone) $("#avisoIOS").classList.remove("hidden");
 if (!esNativo && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js");

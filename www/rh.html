@@ -28,9 +28,9 @@
 <!-- ===== Login ===== -->
 <section id="vLogin" class="min-h-screen flex items-center justify-center p-4">
   <form id="fLogin" class="w-full max-w-sm bg-surface border border-line rounded-2xl p-6 shadow space-y-4">
-    <div class="flex justify-center"><img src="img/logo.png" alt="Tecnocontrol" class="h-12 w-auto" onerror="this.outerHTML='<span class=&quot;text-2xl font-extrabold text-primary&quot;>TECNO<span class=&quot;text-secondary&quot;>CONTROL</span></span>'"></div>
+    <div class="flex justify-center bg-white rounded-xl py-3 -mx-2"><img src="img/logo.png" alt="Tecnocontrol" class="h-12 w-auto"></div>
     <h1 class="text-lg font-semibold text-center">Panel RH · Checador de Campo</h1>
-    <div class="h-1 w-12 bg-secondary rounded-full mx-auto"></div>
+    <div class="h-1.5 w-full bg-gradient-to-r from-primary via-profundo to-secondary rounded-full"></div>
     <input id="lEmail" type="email" required placeholder="Correo" class="w-full px-3 py-2.5 rounded-lg bg-bg border border-line">
     <input id="lPass" type="password" required placeholder="Contraseña" class="w-full px-3 py-2.5 rounded-lg bg-bg border border-line">
     <button class="w-full py-2.5 rounded-lg bg-primary text-on-primary font-semibold">Entrar</button>
@@ -40,11 +40,15 @@
 
 <!-- ===== App ===== -->
 <section id="vApp" class="hidden min-h-screen flex flex-col">
-  <header class="bg-primary text-on-primary px-6 py-3 flex items-center gap-4 shadow border-b-4 border-secondary">
-    <div class="bg-white rounded-lg h-10 px-2 flex items-center"><img src="img/logo.png" alt="Tecnocontrol" class="h-7 w-auto" onerror="this.parentElement.innerHTML='<span class=&quot;font-extrabold text-primary&quot;>TECNO<span class=&quot;text-secondary&quot;>CONTROL</span></span>'"></div>
-    <h1 class="font-semibold text-lg flex-1">Checador de Campo · RH</h1>
-    <span id="hUsuario" class="text-sm opacity-80"></span>
-    <button id="btnSalir" class="text-sm px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25">Salir</button>
+  <header class="bg-white shadow-sm">
+    <div class="px-6 py-3 flex items-center gap-4">
+      <img src="img/logo.png" alt="Tecnocontrol" class="h-9 w-auto">
+      <div class="h-8 w-px bg-slate-200"></div>
+      <h1 class="font-semibold text-primary flex-1">Checador de Campo · RH</h1>
+      <span id="hUsuario" class="text-sm text-slate-500"></span>
+      <button id="btnSalir" class="text-sm px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-profundo">Salir</button>
+    </div>
+    <div class="h-1.5 bg-gradient-to-r from-primary via-profundo to-secondary"></div>
   </header>
   <nav class="bg-surface border-b border-line px-6 flex gap-6 text-sm font-medium">
     <button class="tab activo py-3 border-b-2 border-transparent" data-tab="tAsis">Asistencias <span id="badgePend" class="hidden ml-1 px-1.5 rounded-full bg-warning text-white text-xs"></span></button>
@@ -483,7 +487,9 @@ $("#tbEmp").addEventListener("click", async e => {
     const col = el.dataset.accion === "activo" ? "activo" : "checa_campo";
     const { error } = await sb.from("campo_empleados").update({ [col]: el.checked }).eq("id", emp.id);
     if (error) { el.checked = !el.checked; return toast(error.message, "error"); }
-    emp[col] = el.checked; pintarEmpleados();
+    emp[col] = el.checked;
+    if (!el.checked) { delete dispositivos[emp.id]; toast(`${emp.nombre}: dado de baja y su celular quedó liberado`); }
+    pintarEmpleados();
   }
   if (el.dataset.accion === "liberar") {
     if (!confirm(`¿Liberar el celular de ${emp.nombre}? Podrá vincular uno nuevo en su siguiente checada.`)) return;
