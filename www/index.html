@@ -17,7 +17,7 @@
 <script src="js/theme.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.454.0/dist/umd/lucide.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+<script src="js/face-api.js"></script>
 <script src="js/rostro.js"></script>
 <style>
   html,body{height:100%}
@@ -251,7 +251,11 @@ async function prepararRostro() {
   if (modelosOK) return;
   $("#btnChecar span").textContent = "Preparando reconocimiento…";
   try { await Rostro.cargar(); modelosOK = true; }
-  catch { toast("No se pudo preparar el reconocimiento facial. Revisa tu internet."); setTimeout(prepararRostro, 8000); }
+  catch {
+    toast("No se pudo preparar el reconocimiento facial. Reintentando…");
+    $("#btnChecar span").textContent = "Reintentando reconocimiento…";
+    setTimeout(prepararRostro, 5000); actualizarBoton(); return;
+  }
   if (!enviando) $("#btnChecar span").textContent = "Checar";
   actualizarBoton();
 }
