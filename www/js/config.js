@@ -4,7 +4,9 @@ window.APP_CONFIG = {
   SUPABASE_URL: "https://vlbyjoqessxcmkejcujp.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_18A7j06AwZqdw3gmqUDJHQ_Twu0t2a8",
   FUNCION_CHECKIN: "campo-checkin",
-  PRECISION_MAX_M: 30,
+  PRECISION_MAX_M: 30,        // precisión ideal (aprobación automática)
+  PRECISION_TOLERADA_M: 150,  // con solo datos móviles se acepta hasta esto, pero queda para revisión de RH
+  ESPERA_GPS_S: 20,           // segundos esperando la precisión ideal antes de aceptar la tolerada
   ZONA_HORARIA: "America/Chihuahua",
   EMPRESA: "Tecnocontrol",
   CENTRO_MAPA: [28.6353, -106.0889] // Chihuahua
