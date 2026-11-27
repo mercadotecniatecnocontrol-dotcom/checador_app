@@ -152,6 +152,8 @@ const esNativo = !!window.Capacitor?.isNativePlatform?.();
 const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const PLATAFORMA = esNativo ? "android-apk" : esIOS ? "ios-web" : "web";
 const MAX_ACC = C.PRECISION_MAX_M;
+const TOL_ACC = C.PRECISION_TOLERADA_M ?? MAX_ACC;
+const ESPERA_GPS = (C.ESPERA_GPS_S ?? 20) * 1000;
 
 // Identificador de este celular (se crea una vez y se queda guardado)
 const DISPOSITIVO = (() => {
@@ -162,7 +164,7 @@ const DISPOSITIVO = (() => {
   } catch { return "sin-almacenamiento"; }
 })();
 
-let empleados = [], empleado = null, elegido = null, pos = null, gpsWatch = null, stream = null, enviando = false, modelosOK = false;
+let empleados = [], empleado = null, elegido = null, pos = null, gpsWatch = null, gpsInicio = 0, stream = null, enviando = false, modelosOK = false;
 
 lucide.createIcons();
 
@@ -261,21 +263,31 @@ async function prepararRostro() {
 }
 
 function iniciarGPS() {
-  pos = null; pintarGPS();
+  pos = null; gpsInicio = Date.now(); pintarGPS();
   if (!navigator.geolocation) return gpsError("Este dispositivo no tiene GPS disponible");
+  if (gpsWatch != null) navigator.geolocation.clearWatch(gpsWatch);
   gpsWatch = navigator.geolocation.watchPosition(p => {
     const acc = p.coords.accuracy, viejo = !pos || Date.now() - pos.t > 15000;
     if (viejo || acc <= pos.acc) pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc, t: Date.now() };
     pintarGPS();
-  }, e => gpsError(e.code === 1 ? "Permiso de ubicación denegado. Actívalo en Ajustes." : "No se pudo obtener la ubicación"),
-  { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  }, e => {
+    if (e.code === 1) return gpsError("Permiso de ubicación denegado. Actívalo en Ajustes.");
+    if (!pos) $("#gpsTexto").textContent = "Buscando señal GPS… (sal a un lugar abierto si tarda)";
+  },
+  { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
 }
-function gpsValido() { return pos && pos.acc < MAX_ACC && Date.now() - pos.t < 30000; }
+// Precisión ideal (< 30 m) o, tras unos segundos de espera, la tolerada (datos móviles / interiores).
+function gpsValido() {
+  if (!pos || Date.now() - pos.t >= 30000) return false;
+  return pos.acc < MAX_ACC || (pos.acc <= TOL_ACC && Date.now() - gpsInicio >= ESPERA_GPS);
+}
 function pintarGPS() {
-  const ok = gpsValido();
-  $("#gpsTexto").textContent = !pos ? "Buscando señal GPS…" : ok ? "Ubicación lista" : "Mejorando precisión…";
-  $("#gpsDetalle").textContent = pos ? `Precisión: ${Math.round(pos.acc)} m (requerido < ${MAX_ACC} m)` : `Se requiere precisión menor a ${MAX_ACC} m`;
-  $("#gpsPunto").className = `w-3 h-3 rounded-full ${ok ? "bg-accent" : "bg-warning animate-pulse"}`;
+  const ok = gpsValido(), aprox = ok && pos.acc >= MAX_ACC;
+  $("#gpsTexto").textContent = !pos ? "Buscando señal GPS…" : aprox ? "Ubicación aproximada (RH la revisará)" : ok ? "Ubicación lista" : "Mejorando precisión…";
+  let det = pos ? `Precisión: ${Math.round(pos.acc)} m` : `Se requiere precisión menor a ${MAX_ACC} m`;
+  if (pos && !ok) det += pos.acc <= TOL_ACC ? " · espera unos segundos…" : " · activa el Wi‑Fi (no hace falta conectarte) o acércate a una ventana";
+  $("#gpsDetalle").textContent = det;
+  $("#gpsPunto").className = `w-3 h-3 rounded-full ${ok && !aprox ? "bg-accent" : "bg-warning"} ${ok ? "" : "animate-pulse"}`;
   actualizarBoton();
 }
 function gpsError(msg) {
